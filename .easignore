@@ -43,6 +43,14 @@ android/local.properties
 ios/build/
 ios/Pods/
 
+# --- Clé de publication ---
+# EAS détient déjà la sienne côté serveur : envoyer la copie locale
+# n'apporterait rien et l'exposerait sans raison.
+android/keystore.properties
+*.jks
+*.keystore
+!android/app/debug.keystore
+
 # --- Inutile à la build de l'application mobile ---
 # Le serveur se déploie séparément (voir DEPLOIEMENT.md) : l'embarquer
 # alourdit l'archive envoyée à EAS sans aucun bénéfice.

@@ -27,3 +27,12 @@ android/app/.cxx/
 android/local.properties
 ios/build/
 ios/Pods/
+
+# Cle de publication Android et ses mots de passe. Une fuite est
+# irrattrapable : quiconque la detient peut signer une mise a jour que les
+# telephones deja equipes accepteront comme venant de nous.
+# debug.keystore fait exception : cle publique du modele Android, sans valeur.
+android/keystore.properties
+*.jks
+*.keystore
+!android/app/debug.keystore

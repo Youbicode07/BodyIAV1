@@ -137,6 +137,81 @@ dans l'application : la ligne en rouge dit exactement quel maillon est rompu.
 
 ---
 
+## Construire l'AAB sans EAS (quota épuisé)
+
+Le forfait gratuit EAS accorde un nombre limité de builds par mois. Une fois
+épuisé, `eas build` refuse de démarrer jusqu'à la remise à zéro. La machine de
+développement peut produire exactement la même archive, sans quota ni attente.
+
+### La clé de publication, d'abord
+
+Le Play Store identifie une application par la clé qui signe ses archives.
+Publier avec une autre clé **n'est pas rattrapable** : Google refuse l'envoi, et
+aucune manipulation ne permet de reprendre l'application existante.
+
+Ta clé est sur les serveurs EAS. Récupère-la une fois pour toutes :
+
+```bash
+npx eas credentials -p android
+```
+
+Choisis le profil **production**, puis
+`Keystore: Manage everything needed to build your project`
+→ `Download existing keystore`.
+
+EAS écrit un fichier `.jks` et affiche les trois mots de passe
+(*Keystore password*, *Key alias*, *Key password*). **Note-les** : ils ne sont
+plus réaffichés ensuite.
+
+Place le `.jks` dans `android/app/`, puis crée `android/keystore.properties` :
+
+```properties
+storeFile=le-nom-du-fichier.jks
+storePassword=...
+keyAlias=...
+keyPassword=...
+```
+
+Ce fichier et les `.jks` sont exclus de git : ils contiennent les mots de passe
+en clair, et quiconque détient la clé peut signer une mise à jour que les
+téléphones déjà équipés accepteront comme venant de toi.
+
+### Construire
+
+```bash
+cd android
+./gradlew bundleRelease
+```
+
+L'archive sort dans :
+
+```
+android/app/build/outputs/bundle/release/app-release.aab
+```
+
+### Ce que le projet fait pour toi
+
+- **Les variables d'environnement** — EAS injectait `API_URL` et les
+  identifiants Google depuis `eas.json`. En local, `process.env` est vide, et
+  l'application serait partie en mode « local seul » : elle fonctionne, elle
+  n'affiche aucune erreur, et aucune donnée ne quitte le téléphone.
+  `app.config.js` relit donc `eas.json` en repli. Une seule source de vérité :
+  corriger l'adresse du serveur à un endroit vaut pour les deux façons de
+  construire.
+
+- **La signature** — le modèle Expo signait la version release avec la clé de
+  *debug*. L'archive se construit sans broncher puis se fait refuser à l'envoi,
+  vingt minutes plus tard. `android/app/build.gradle` interrompt désormais la
+  construction tout de suite si `keystore.properties` manque.
+
+### Numéro de version
+
+EAS incrémentait `versionCode` à chaque build. En local, c'est à toi :
+`android/app/build.gradle`, champ `versionCode`. Le Play Store **refuse** un
+numéro déjà envoyé — prends strictement supérieur au dernier publié.
+
+---
+
 ## Le piège Google Sign-In sur une build Play Store
 
 Google Play **resigne** ton application (Play App Signing, actif par défaut

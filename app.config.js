@@ -1,9 +1,35 @@
 // Expo charge automatiquement les variables présentes dans .env lors de
 // l'évaluation de cette configuration. dotenv reste réservé au backend Node.
 
-const googleIosClientId = process.env.GOOGLE_IOS_CLIENT_ID ?? '';
-const googleAndroidClientId = process.env.GOOGLE_ANDROID_CLIENT_ID ?? '';
-const googleWebClientId = process.env.GOOGLE_WEB_CLIENT_ID ?? '';
+/**
+ * REPLI SUR eas.json
+ * ==================
+ *
+ * EAS Build injecte lui-même les variables déclarées dans eas.json. Une
+ * construction lancée à la main (`gradlew bundleRelease`, quand le quota EAS
+ * du mois est épuisé) n'a rien de tel : `process.env` y est vide, et sans ce
+ * repli l'application partait en mode « local seul » — elle fonctionne, elle
+ * n'affiche aucune erreur, et aucune donnée ne quitte le téléphone.
+ *
+ * Relire eas.json plutôt que dupliquer les valeurs dans un second fichier
+ * garde une seule source de vérité : corriger l'adresse du serveur à un seul
+ * endroit vaut pour les deux façons de construire.
+ */
+function fromEasJson(name) {
+  try {
+    const profiles = require('./eas.json')?.build ?? {};
+    const profile = process.env.EAS_BUILD_PROFILE || 'production';
+    return profiles[profile]?.env?.[name] ?? profiles.production?.env?.[name];
+  } catch {
+    return undefined; // eas.json absent ou illisible : on continue sans repli.
+  }
+}
+
+const env = (name) => process.env[name] || fromEasJson(name) || '';
+
+const googleIosClientId = env('GOOGLE_IOS_CLIENT_ID');
+const googleAndroidClientId = env('GOOGLE_ANDROID_CLIENT_ID');
+const googleWebClientId = env('GOOGLE_WEB_CLIENT_ID');
 
 /**
  * Le module natif Google Sign-In a besoin, côté iOS, du « schéma d'URL »
@@ -43,9 +69,10 @@ const googleIosScheme = googleIosClientId ? iosReversedScheme(googleIosClientId)
  * que de livrer une application qui perd les données de ses utilisateurs.
  */
 const apiUrl = (
-  process.env.API_URL ??
-  process.env.BACKEND_URL ??
-  process.env.PAYMENTS_URL ??
+  process.env.API_URL ||
+  process.env.BACKEND_URL ||
+  process.env.PAYMENTS_URL ||
+  fromEasJson('API_URL') ||
   ''
 ).trim().replace(/\/+$/, '');
 
