@@ -3,6 +3,7 @@ import {
   Animated,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -26,16 +27,27 @@ type Props = {
  * Les valeurs s'éloignent du centre en rapetissant et en s'effaçant : le choix
  * courant se lit sans bandeau ni surlignage lourd. Aucun clavier n'intervient,
  * donc rien ne peut rester bloqué à l'écran.
+ *
+ * Défilement : une ScrollView, pas une FlatList. L'écran qui héberge la
+ * molette défile lui aussi verticalement, et React Native refuse une liste
+ * virtualisée imbriquée dans un défilement de même sens — sa fenêtre de rendu
+ * suppose qu'elle pilote le défilement, ce qui n'est plus vrai ici.
+ * L'avertissement pointait un vrai risque : le recyclage des lignes pouvait
+ * blanchir les valeurs pendant le geste.
+ *
+ * Renoncer à la virtualisation ne coûte rien à cette échelle : les molettes
+ * affichent au plus 97 entrées (les années), chacune une hauteur fixe avec un
+ * seul texte. C'est aussi ce que fait déjà RulerPicker sur le même écran.
  */
 export function WheelPicker({ label, values, index, onChange, accent = colors.brand }: Props) {
-  const listRef = useRef<Animated.FlatList<string | number>>(null);
+  const listRef = useRef<ScrollView>(null);
   const scrollY = useRef(new Animated.Value(index * ITEM_HEIGHT)).current;
   const lastIndex = useRef(index);
 
   // Position initiale sans animation : la molette s'ouvre déjà sur la bonne valeur.
   useEffect(() => {
     const id = setTimeout(() => {
-      listRef.current?.scrollToOffset({ offset: index * ITEM_HEIGHT, animated: false });
+      listRef.current?.scrollTo({ y: index * ITEM_HEIGHT, animated: false });
     }, 0);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -58,21 +70,22 @@ export function WheelPicker({ label, values, index, onChange, accent = colors.br
         {/* Bandeau de sélection, derrière les valeurs. */}
         <View style={[styles.selection, { borderColor: `${accent}55`, backgroundColor: `${accent}0F` }]} pointerEvents="none" />
 
-        <Animated.FlatList
+        <Animated.ScrollView
           ref={listRef}
-          data={values}
-          keyExtractor={(item) => String(item)}
           showsVerticalScrollIndicator={false}
           snapToInterval={ITEM_HEIGHT}
           decelerationRate="fast"
+          // Sans cela, Android laisse l'écran entier happer le geste et la
+          // molette devient impossible à tourner du doigt.
+          nestedScrollEnabled
           contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * ((VISIBLE - 1) / 2) }}
           onMomentumScrollEnd={handleMomentum}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
             useNativeDriver: true,
           })}
           scrollEventThrottle={16}
-          getItemLayout={(_, i) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * i, index: i })}
-          renderItem={({ item, index: i }) => {
+        >
+          {values.map((item, i) => {
             // Distance au centre, exprimée en nombre de crans.
             const distance = Animated.divide(
               Animated.subtract(scrollY, i * ITEM_HEIGHT),
@@ -89,12 +102,15 @@ export function WheelPicker({ label, values, index, onChange, accent = colors.br
               extrapolate: 'clamp',
             });
             return (
-              <Animated.View style={[styles.item, { opacity, transform: [{ scale }] }]}>
+              <Animated.View
+                key={String(item)}
+                style={[styles.item, { opacity, transform: [{ scale }] }]}
+              >
                 <Text style={styles.itemText}>{item}</Text>
               </Animated.View>
             );
-          }}
-        />
+          })}
+        </Animated.ScrollView>
       </View>
     </View>
   );
