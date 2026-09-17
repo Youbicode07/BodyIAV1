@@ -5,46 +5,6 @@ apply plugin: "com.facebook.react"
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
 /**
- * CLÉ DE PUBLICATION
- * ==================
- *
- * Le Play Store identifie une application par la clé qui signe ses archives.
- * Publier avec une autre clé que la première n'est pas rattrapable : Google
- * refuse l'envoi, et il n'existe aucun moyen de « reprendre » l'application.
- *
- * La clé vit donc hors du dépôt — elle porte ses mots de passe en clair — dans
- * android/keystore.properties, décrit par DEPLOIEMENT.md.
- */
-def bodyaiSigningFile = rootProject.file('keystore.properties')
-def bodyaiSigningProps = null
-if (bodyaiSigningFile.exists()) {
-    bodyaiSigningProps = new Properties()
-    bodyaiSigningFile.withInputStream { bodyaiSigningProps.load(it) }
-}
-
-// Sans ce garde-fou, une construction de release sans clé se déroule
-// entièrement, signe avec la clé de debug, et n'échoue qu'à l'envoi sur le
-// Play Store — vingt minutes plus tard, sans indice sur la cause.
-gradle.taskGraph.whenReady { graph ->
-    def wantsRelease = graph.allTasks.any { it.name ==~ /(?i).*(bundle|assemble)Release.*/ }
-    if (wantsRelease && bodyaiSigningProps == null) {
-        throw new GradleException(
-            "\n\n[BodyAI] Construction de release interrompue : clé de publication absente.\n\n" +
-            "  android/keystore.properties est introuvable. Sans lui, l'archive serait\n" +
-            "  signée avec la clé de DEBUG et le Play Store la refuserait.\n\n" +
-            "  1. Récupère la clé depuis EAS :  npx eas credentials -p android\n" +
-            "     puis « Keystore: Manage everything » → « Download existing keystore ».\n" +
-            "  2. Place le fichier .jks dans android/app/\n" +
-            "  3. Crée android/keystore.properties :\n" +
-            "         storeFile=nom-du-fichier.jks\n" +
-            "         storePassword=...\n" +
-            "         keyAlias=...\n" +
-            "         keyPassword=...\n\n" +
-            "  Détail complet dans DEPLOIEMENT.md.\n")
-    }
-}
-
-/**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
@@ -132,10 +92,7 @@ android {
         applicationId 'com.bodyai.yourh2026'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // À incrémenter à la main avant chaque envoi au Play Store, qui refuse
-        // un numéro déjà reçu. EAS s'en chargeait tout seul (appVersionSource
-        // "remote", compteur monté jusqu'à 23) ; une construction locale, non.
-        versionCode 24
+        versionCode 1
         versionName "1.0.0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
@@ -147,29 +104,15 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
-        // Clé de publication, lue dans android/keystore.properties — un fichier
-        // tenu hors de git, car il contient les mots de passe en clair.
-        // Voir DEPLOIEMENT.md pour l'obtenir depuis EAS.
-        release {
-            if (bodyaiSigningProps != null) {
-                storeFile file(bodyaiSigningProps['storeFile'])
-                storePassword bodyaiSigningProps['storePassword']
-                keyAlias bodyaiSigningProps['keyAlias']
-                keyPassword bodyaiSigningProps['keyPassword']
-            }
-        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Le modèle Expo signait ici avec la clé de DEBUG. Une telle archive
-            // se construit sans broncher puis se fait refuser à l'envoi par le
-            // Play Store, qui attend la clé d'origine — après vingt minutes de
-            // compilation. Le garde-fou plus bas arrête donc la construction
-            // avant, tant que la vraie clé n'est pas fournie.
-            signingConfig bodyaiSigningProps != null ? signingConfigs.release : signingConfigs.debug
+            // Caution! In production, you need to generate your own keystore file.
+            // see https://reactnative.dev/docs/signed-apk-android.
+            signingConfig signingConfigs.debug
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

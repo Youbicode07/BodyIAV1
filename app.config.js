@@ -231,7 +231,7 @@ module.exports = {
       // que de simuler un encaissement.
       paymentsUrl: process.env.PAYMENTS_URL ?? process.env.BACKEND_URL ?? '',
       eas: {
-        projectId: 'b038fcce-bdd5-4315-843b-c77e1cdeb3d3',
+        projectId: 'e4ec2ade-59e0-4ad7-ace6-6440ddcabed8',
       },
     },
   },
