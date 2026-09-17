@@ -223,9 +223,24 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     try {
       payload = JSON.parse(text);
     } catch {
+      // Une réponse non-JSON ne vient jamais de l'application : le serveur
+      // répond toujours en JSON, y compris pour ses erreurs. C'est donc
+      // l'hébergeur qui a répondu à sa place, avec sa propre page d'erreur —
+      // conteneur arrêté, endormi ou redéployé sous une autre adresse. Dire
+      // « vérifie l'adresse configurée » envoyait l'utilisateur chercher une
+      // faute de frappe dans un réglage auquel il n'a pas accès ; le seul
+      // geste utile de son côté est de réessayer un peu plus tard.
+      const indisponible =
+        response.status === 404 ||
+        response.status === 502 ||
+        response.status === 503 ||
+        response.status === 504;
       throw new ApiError(
-        `Réponse inattendue du serveur (${response.status}). Vérifie l'adresse configurée.`,
+        indisponible
+          ? 'Le service est momentanément indisponible. Réessaie dans quelques minutes.'
+          : `Le serveur a renvoyé une réponse illisible (${response.status}).`,
         response.status,
+        indisponible ? 'indisponible' : undefined,
       );
     }
   }
